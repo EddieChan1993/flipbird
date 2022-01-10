@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flipbird/game"
 	"flipbird/scene"
 	"fmt"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -71,6 +72,7 @@ type Game struct {
 	birds    scene.Birds
 	scorePng scene.ScorePng
 	mode     Mode
+	scoreDB  game.IScoreDb
 
 	count int
 
@@ -107,18 +109,20 @@ func (g *Game) init() {
 	g.land.Init()
 	g.pipe.Init()
 	g.birds.Init()
+	g.scoreDB = game.Init()
+	g.bestScore = g.scoreDB.GetBestScore()
+	g.score = 0
 	g.pipeHitMode = PipeNone
 	g.x16 = 0
 	g.y16 = 4000
 	g.vy16 = 0
+	g.count = 0
 	g.cameraX = -150
 	g.cameraY = 0
-	g.score = 4313247
 	g.pipeTileYs = make([]int, 256)
 	for i := range g.pipeTileYs {
 		g.pipeTileYs[i] = rand.Intn(pipeGapY)
 	}
-
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
@@ -152,6 +156,7 @@ func (g *Game) Update() error {
 			//g.hitPlayer.Play()
 			g.mode = ModeGameOver
 			g.gameOverCount = 30
+			g.scoreDB.Save(g.score)
 		}
 	case ModeGameOver:
 		if g.gameOverCount > 0 {
@@ -178,7 +183,7 @@ func (g *Game) drawScore(screen *ebiten.Image) {
 	op := &ebiten.DrawImageOptions{}
 	for i, scorePer := range scoreSlice {
 		op.GeoM.Reset()
-		op.GeoM.Translate(screenWidth-float64(g.scorePng.Width*(i+1)-3), 0)
+		op.GeoM.Translate(screenWidth-float64(g.scorePng.Width*(i+1))-10, 0)
 		screen.DrawImage(scene.ScoreImg[scorePer], op)
 	}
 }
@@ -194,7 +199,7 @@ func (g *Game) drawBird(screen *ebiten.Image) {
 	op.Filter = ebiten.FilterLinear
 	screen.DrawImage(scene.BirdImg[index], op)
 
-	//ebitenutil.DrawRect(screen, float64(g.x16/16.0)-float64(g.cameraX), float64(g.y16/16.0)-float64(g.cameraY), float64(g.birds.WidthPhysics), float64(g.birds.HeightPhysics), color.RGBA{255, 100, 100, 100})
+	//ebitenutil.DrawRect(screen, float64(g.x16/g.birds.Width)-float64(g.cameraX), float64(g.y16/g.birds.Height)-float64(g.cameraY), float64(g.birds.WidthPhysics), float64(g.birds.HeightPhysics), color.RGBA{255, 100, 100, 100})
 }
 
 func (g *Game) isKeyJustPressed() bool {
