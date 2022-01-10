@@ -24,6 +24,8 @@ const (
 	pipeStartOffsetX = 1
 	pipeGapY         = 90
 	pipeGapX         = 150
+
+	birdHeadRec = 192
 )
 
 const (
@@ -66,16 +68,16 @@ func (g *Game) pipeAt(tileX int) (tileY int, ok bool) {
 }
 
 type Game struct {
-	bg       scene.Bg
-	land     scene.Land
-	pipe     scene.Pipe
-	birds    scene.Birds
-	scorePng scene.ScorePng
-	mode     Mode
-	scoreDB  game.IScoreDb
+	bg        scene.Bg
+	land      scene.Land
+	pipe      scene.Pipe
+	birds     scene.Birds
+	gameScene scene.GameExtra
+	scorePng  scene.ScorePng
 
-	count int
-
+	mode    Mode
+	count   int
+	scoreDB game.IScoreDb
 	// The bird's position
 	x16  int
 	y16  int
@@ -109,6 +111,7 @@ func (g *Game) init() {
 	g.land.Init()
 	g.pipe.Init()
 	g.birds.Init()
+	g.gameScene.Init()
 	g.scoreDB = game.Init()
 	g.bestScore = g.scoreDB.GetBestScore()
 	g.score = 0
@@ -140,15 +143,15 @@ func (g *Game) Update() error {
 		g.x16 += g.birds.Width
 		g.cameraX += 1
 		if g.isKeyJustPressed() {
-			g.vy16 = -192
+			g.vy16 = -birdHeadRec
 			//g.jumpPlayer.Rewind()
 			//g.jumpPlayer.Play()
 		}
 		g.y16 += g.vy16
 		// Gravity
 		g.vy16 += 8
-		if g.vy16 > 192 {
-			g.vy16 = 192
+		if g.vy16 > birdHeadRec {
+			g.vy16 = birdHeadRec
 		}
 		if g.hit() {
 			fmt.Println("碰到了")
@@ -176,30 +179,53 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.drawBird(screen)
 	g.drawPipe(screen)
 	g.drawScore(screen)
+	g.DrawGameOver(screen)
+	g.DrawGameStart(screen)
+}
+
+func (g *Game) DrawGameOver(screen *ebiten.Image) {
+	if g.mode != ModeGameOver {
+		return
+	}
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Reset()
+	op.GeoM.Translate(-float64(g.gameScene.GameOverTitleWidth/2), 0)
+	op.GeoM.Translate(screenWidth/2, screenHeight*1/3)
+	screen.DrawImage(scene.GameOverPng, op)
 }
 
 func (g *Game) drawScore(screen *ebiten.Image) {
+	if g.mode != ModeGame && g.mode != ModeGameOver {
+		return
+	}
 	scoreSlice := g.scorePng.ScoreDivide(g.score)
 	op := &ebiten.DrawImageOptions{}
 	for i, scorePer := range scoreSlice {
 		op.GeoM.Reset()
-		op.GeoM.Translate(screenWidth-float64(g.scorePng.Width*(i+1))-10, 0)
+		if i == 0 {
+			op.GeoM.Translate(screenWidth-float64(g.scorePng.Width*(i+1))-10, 0)
+		} else {
+			op.GeoM.Translate(screenWidth-float64(g.scorePng.Width*(i+1))-8, 0)
+		}
 		screen.DrawImage(scene.ScoreImg[scorePer], op)
 	}
 }
 
 func (g *Game) drawBird(screen *ebiten.Image) {
+	if g.mode != ModeGame && g.mode != ModeGameOver {
+		return
+	}
 	op := &ebiten.DrawImageOptions{}
 	index := (g.count / 5) % 3
 	w, h := g.birds.Width, g.birds.Height
 	op.GeoM.Translate(-float64(w)/2.0, -float64(h)/2.0)
-	op.GeoM.Rotate(float64(g.vy16) / 96.0 * math.Pi / 6)
+	op.GeoM.Rotate(float64(g.vy16) / birdHeadRec * math.Pi / 6)
 	op.GeoM.Translate(float64(w)/2.0-5, float64(h)/2.0-11)
 	op.GeoM.Translate(float64(g.x16/g.birds.Width)-float64(g.cameraX), float64(g.y16/g.birds.Height)-float64(g.cameraY))
 	op.Filter = ebiten.FilterLinear
 	screen.DrawImage(scene.BirdImg[index], op)
 
-	//ebitenutil.DrawRect(screen, float64(g.x16/g.birds.Width)-float64(g.cameraX), float64(g.y16/g.birds.Height)-float64(g.cameraY), float64(g.birds.WidthPhysics), float64(g.birds.HeightPhysics), color.RGBA{255, 100, 100, 100})
+	//ebitenutil.DrawRect(screen, float64(g.x16/g.birds.GameOverTitleWidth)-float64(g.cameraX), float64(g.y16/g.birds.Height)-float64(g.cameraY), float64(g.birds.WidthPhysics), float64(g.birds.HeightPhysics), color.RGBA{255, 100, 100, 100})
 }
 
 func (g *Game) isKeyJustPressed() bool {
@@ -283,9 +309,36 @@ func (g *Game) drawScene(screen *ebiten.Image) {
 	}
 }
 
+func (g *Game) DrawGameStart(screen *ebiten.Image) {
+	if g.mode != ModeTitle {
+		return
+	}
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Reset()
+	op.GeoM.Translate(-float64(g.gameScene.GameStartTitleWidth/2), 0)
+	op.GeoM.Translate(screenWidth/2, screenHeight*1/4)
+	screen.DrawImage(scene.GameTitlePng, op)
+
+	op.GeoM.Reset()
+	op.GeoM.Translate(-float64(g.gameScene.GamePlayBtnPngWidth/2), 0)
+	op.GeoM.Translate(screenWidth/2-float64(g.gameScene.GamePlayBtnPngWidth/2), screenHeight*2/5)
+	screen.DrawImage(scene.GamePlayBtnPng, op)
+
+	op.GeoM.Reset()
+	op.GeoM.Translate(-float64(g.gameScene.GameRankBtnPngWidth/2), 0)
+	op.GeoM.Translate(screenWidth/2+float64(g.gameScene.GameRankBtnPngWidth/2), screenHeight*2/5)
+	screen.DrawImage(scene.GameRankBtnPng, op)
+
+	op.GeoM.Reset()
+	op.GeoM.Translate(-float64(g.gameScene.TutorialWidth/2), float64(g.gameScene.TutorialHeight))
+	op.GeoM.Translate(screenWidth/2, screenHeight*2/5)
+	screen.DrawImage(scene.TutorialPng, op)
+}
+
 func main() {
+	defer game.OSFile.Close()
 	ebiten.SetWindowSize(screenWidth, screenHeight)
-	ebiten.SetWindowTitle("Flappy Gopher (Ebiten Demo)")
+	ebiten.SetWindowTitle("Flappy Gopher")
 	if err := ebiten.RunGame(NewGame()); err != nil {
 		panic(err)
 	}

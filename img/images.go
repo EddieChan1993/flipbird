@@ -28,3 +28,18 @@ var PipeDownPng []byte
 
 //go:embed flappybird/fontscore/*
 var ScorePngs embed.FS
+
+//go:embed flappybird/text_game_over.png
+var GameOverPng []byte
+
+//go:embed flappybird/title.png
+var TitlePng []byte
+
+//go:embed flappybird/button_play.png
+var PlayBtn []byte
+
+//go:embed flappybird/button_score.png
+var RankBtn []byte
+
+//go:embed flappybird/tutorial.png
+var Tutorial []byte
