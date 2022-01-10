@@ -2,7 +2,6 @@ package main
 
 import (
 	"flipbird/scene"
-	_ "flipbird/scene"
 	"fmt"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -30,6 +29,12 @@ const (
 	ModeTitle Mode = iota
 	ModeGame
 	ModeGameOver
+)
+
+const (
+	PipeNone Mode = iota //进入管子
+	PipeIn               //进入管子
+	PipeOut              //出管子
 )
 
 var ()
@@ -60,11 +65,12 @@ func (g *Game) pipeAt(tileX int) (tileY int, ok bool) {
 }
 
 type Game struct {
-	bg    scene.Bg
-	land  scene.Land
-	pipe  scene.Pipe
-	birds scene.Birds
-	mode  Mode
+	bg       scene.Bg
+	land     scene.Land
+	pipe     scene.Pipe
+	birds    scene.Birds
+	scorePng scene.ScorePng
+	mode     Mode
 
 	count int
 
@@ -78,8 +84,12 @@ type Game struct {
 	cameraY int
 
 	// Pipes
-	pipeTileYs    []int
-	gameoverCount int
+	pipeTileYs []int
+
+	score         int
+	bestScore     int
+	gameOverCount int
+	pipeHitMode   Mode
 }
 
 func init() {
@@ -93,14 +103,17 @@ func NewGame() *Game {
 
 func (g *Game) init() {
 	g.bg.Init()
+	g.scorePng.Init()
 	g.land.Init()
 	g.pipe.Init()
 	g.birds.Init()
+	g.pipeHitMode = PipeNone
 	g.x16 = 0
 	g.y16 = 4000
+	g.vy16 = 0
 	g.cameraX = -150
 	g.cameraY = 0
-	g.count = 0
+	g.score = 4313247
 	g.pipeTileYs = make([]int, 256)
 	for i := range g.pipeTileYs {
 		g.pipeTileYs[i] = rand.Intn(pipeGapY)
@@ -120,32 +133,31 @@ func (g *Game) Update() error {
 		}
 	case ModeGame:
 		g.count++
-		g.x16 += 32
-		g.cameraX += 2
+		g.x16 += g.birds.Width
+		g.cameraX += 1
 		if g.isKeyJustPressed() {
-			g.vy16 = -96
+			g.vy16 = -192
 			//g.jumpPlayer.Rewind()
 			//g.jumpPlayer.Play()
 		}
 		g.y16 += g.vy16
-
 		// Gravity
-		g.vy16 += 4
-		if g.vy16 > 96 {
-			g.vy16 = 96
+		g.vy16 += 8
+		if g.vy16 > 192 {
+			g.vy16 = 192
 		}
 		if g.hit() {
 			fmt.Println("碰到了")
 			//g.hitPlayer.Rewind()
 			//g.hitPlayer.Play()
 			g.mode = ModeGameOver
-			g.gameoverCount = 30
+			g.gameOverCount = 30
 		}
 	case ModeGameOver:
-		if g.gameoverCount > 0 {
-			g.gameoverCount--
+		if g.gameOverCount > 0 {
+			g.gameOverCount--
 		}
-		if g.gameoverCount == 0 && g.isKeyJustPressed() {
+		if g.gameOverCount == 0 && g.isKeyJustPressed() {
 			fmt.Println("游戏结束")
 			g.init()
 			g.mode = ModeTitle
@@ -158,6 +170,17 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.drawScene(screen)
 	g.drawBird(screen)
 	g.drawPipe(screen)
+	g.drawScore(screen)
+}
+
+func (g *Game) drawScore(screen *ebiten.Image) {
+	scoreSlice := g.scorePng.ScoreDivide(g.score)
+	op := &ebiten.DrawImageOptions{}
+	for i, scorePer := range scoreSlice {
+		op.GeoM.Reset()
+		op.GeoM.Translate(screenWidth-float64(g.scorePng.Width*(i+1)-3), 0)
+		screen.DrawImage(scene.ScoreImg[scorePer], op)
+	}
 }
 
 func (g *Game) drawBird(screen *ebiten.Image) {
@@ -166,10 +189,12 @@ func (g *Game) drawBird(screen *ebiten.Image) {
 	w, h := g.birds.Width, g.birds.Height
 	op.GeoM.Translate(-float64(w)/2.0, -float64(h)/2.0)
 	op.GeoM.Rotate(float64(g.vy16) / 96.0 * math.Pi / 6)
-	op.GeoM.Translate(float64(w)/2.0, float64(h)/2.0)
-	op.GeoM.Translate(float64(g.x16/16.0)-float64(g.cameraX), float64(g.y16/16.0)-float64(g.cameraY))
+	op.GeoM.Translate(float64(w)/2.0-5, float64(h)/2.0-11)
+	op.GeoM.Translate(float64(g.x16/g.birds.Width)-float64(g.cameraX), float64(g.y16/g.birds.Height)-float64(g.cameraY))
 	op.Filter = ebiten.FilterLinear
 	screen.DrawImage(scene.BirdImg[index], op)
+
+	//ebitenutil.DrawRect(screen, float64(g.x16/16.0)-float64(g.cameraX), float64(g.y16/16.0)-float64(g.cameraY), float64(g.birds.WidthPhysics), float64(g.birds.HeightPhysics), color.RGBA{255, 100, 100, 100})
 }
 
 func (g *Game) isKeyJustPressed() bool {
@@ -188,8 +213,8 @@ func (g *Game) hit() bool {
 	}
 	pipeIndex := 1
 	birthW, birthH := g.birds.WidthPhysics, g.birds.HeightPhysics
-	x0 := float64(g.x16/16.0) - float64(g.cameraX)
-	y0 := float64(g.y16/16.0) - float64(g.cameraY)
+	x0 := float64(g.x16/g.birds.Width) - float64(g.cameraX)
+	y0 := float64(g.y16/g.birds.Height) - float64(g.cameraY)
 	y1 := y0 + float64(birthH)
 	//上限
 	if y0 < 0 {
@@ -206,9 +231,18 @@ func (g *Game) hit() bool {
 		pipeX := float64(pipeIndex*(g.pipe.WidthDown+pipeGapX) - floorMod(g.count, g.pipe.WidthDown+pipeGapX))
 		pipeY := -70 - pipeGapY + float64(pipeGapHigh) + float64(g.pipe.HeightUp)
 		if pipeX <= x0+float64(birthW) && pipeX >= x0-float64(g.pipe.WidthUp) {
+			//进入
+			g.pipeHitMode = PipeIn
 			if y0 <= pipeY || y1 >= pipeY+float64(pipeGapY+70) {
 				return true
 			}
+		}
+		if g.pipeHitMode == PipeIn && pipeX+float64(g.pipe.WidthDown) < x0 {
+			//出去
+			g.pipeHitMode = PipeOut
+			g.score++
+			g.bestScore = int(math.Max(float64(g.score), float64(g.bestScore)))
+			//fmt.Println("成功出去  score", g.score, " best score", g.bestScore)
 		}
 	}
 	return false

@@ -29,7 +29,8 @@ func init() {
 	BirdImg[2] = ebiten.NewImageFromImage(birdPng2)
 }
 
-const physicsCap = 10
+const physicsWidthCap = 12
+const physicsHeightCap = 20
 
 type Birds struct {
 	Width  int
@@ -41,5 +42,5 @@ type Birds struct {
 
 func (b *Birds) Init() {
 	b.Width, b.Height = BirdImg[0].Size()
-	b.WidthPhysics, b.HeightPhysics = b.Width-physicsCap, b.Height-physicsCap
+	b.WidthPhysics, b.HeightPhysics = b.Width-physicsWidthCap, b.Height-physicsHeightCap
 }

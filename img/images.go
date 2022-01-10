@@ -1,6 +1,9 @@
 package img
 
-import _ "embed"
+import (
+	"embed"
+	_ "embed"
+)
 
 //go:embed flappybird/bird0_0.png
 var BirdPng0 []byte
@@ -22,3 +25,6 @@ var PipeUpPng []byte
 
 //go:embed flappybird/pipe_down.png
 var PipeDownPng []byte
+
+//go:embed flappybird/fontscore/*
+var ScorePngs embed.FS
