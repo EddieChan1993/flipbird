@@ -1,13 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"flipbird/game"
+	"flipbird/radio"
 	"flipbird/scene"
-	"fmt"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/audio"
+	"github.com/hajimehoshi/ebiten/v2/audio/mp3"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"image"
 	_ "image/png"
+	"log"
 	"math"
 	"math/rand"
 	"time"
@@ -97,6 +101,11 @@ type Game struct {
 	bestScore     int
 	gameOverCount int
 	pipeHitMode   Mode
+
+	audioContext *audio.Context
+	flyPlayer    *audio.Player
+	hitPlayer    *audio.Player
+	dingPlayer   *audio.Player
 }
 
 func init() {
@@ -115,11 +124,8 @@ func (g *Game) init() {
 	g.pipe.Init()
 	g.birds.Init()
 	g.gameScene.Init()
-	g.scoreDB = game.Init()
 	g.rankPanel.Init()
-	g.bestScore = g.scoreDB.GetBestScore()
-	g.lastScore = g.scoreDB.GetLastScore()
-	g.score = 0
+	g.initScore()
 	g.pipeHitMode = PipeNone
 	g.x16 = 0
 	g.y16 = 4000
@@ -130,6 +136,45 @@ func (g *Game) init() {
 	g.pipeTileYs = make([]int, 256)
 	for i := range g.pipeTileYs {
 		g.pipeTileYs[i] = rand.Intn(pipeGapY)
+	}
+	g.initRadio()
+}
+
+func (g *Game) initScore() {
+	g.scoreDB = game.Init()
+	g.bestScore = g.scoreDB.GetBestScore()
+	g.lastScore = g.scoreDB.GetLastScore()
+	g.score = 0
+}
+
+func (g *Game) initRadio() {
+	if g.audioContext == nil {
+		g.audioContext = audio.NewContext(32000)
+	}
+	flyR, err := mp3.Decode(g.audioContext, bytes.NewReader(radio.FlyRadio))
+	if err != nil {
+		log.Fatal(err)
+	}
+	g.flyPlayer, err = g.audioContext.NewPlayer(flyR)
+	if err != nil {
+		log.Fatal(err)
+	}
+	hitR, err := mp3.Decode(g.audioContext, bytes.NewReader(radio.HitRadio))
+	if err != nil {
+		log.Fatal(err)
+	}
+	g.hitPlayer, err = g.audioContext.NewPlayer(hitR)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	dingR, err := mp3.Decode(g.audioContext, bytes.NewReader(radio.DingRadio))
+	if err != nil {
+		log.Fatal(err)
+	}
+	g.dingPlayer, err = g.audioContext.NewPlayer(dingR)
+	if err != nil {
+		log.Fatal(err)
 	}
 }
 
@@ -158,8 +203,8 @@ func (g *Game) Update() error {
 		g.cameraX += 1
 		if g.isKeyJustPressed() {
 			g.vy16 = -birdHeadRec
-			//g.jumpPlayer.Rewind()
-			//g.jumpPlayer.Play()
+			g.flyPlayer.Rewind()
+			g.flyPlayer.Play()
 		}
 		g.y16 += g.vy16
 		// Gravity
@@ -168,9 +213,8 @@ func (g *Game) Update() error {
 			g.vy16 = birdHeadRec
 		}
 		if g.hit() {
-			fmt.Println("碰到了")
-			//g.hitPlayer.Rewind()
-			//g.hitPlayer.Play()
+			g.hitPlayer.Rewind()
+			g.hitPlayer.Play()
 			g.mode = ModeGameOver
 			g.gameOverCount = 30
 			g.scoreDB.Save(g.score)
@@ -180,7 +224,6 @@ func (g *Game) Update() error {
 			g.gameOverCount--
 		}
 		if g.gameOverCount == 0 && g.isKeyJustPressed() {
-			fmt.Println("游戏结束")
 			g.init()
 			g.mode = ModeTitle
 		}
@@ -283,7 +326,8 @@ func (g *Game) hit() bool {
 			//出去
 			g.pipeHitMode = PipeOut
 			g.score++
-			//fmt.Println("成功出去  score", g.score, " best score", g.bestScore)
+			g.dingPlayer.Rewind()
+			g.dingPlayer.Play()
 		}
 	}
 	return false
@@ -353,7 +397,6 @@ func (g *Game) isPlayBtn() bool {
 	btnMaxY := btnMinY + g.gameScene.GamePlayBtnPngHeight
 	if mouseX >= btnMinX && mouseX <= btnMaxX {
 		if mouseY >= btnMinY && mouseY <= btnMaxY {
-			fmt.Println("playbtn")
 			return true
 		}
 	}
@@ -368,7 +411,6 @@ func (g *Game) isRankBtn() bool {
 	btnMaxY := btnMinY + g.gameScene.GameRankBtnPngHeight
 	if mouseX >= btnMinX && mouseX <= btnMaxX {
 		if mouseY >= btnMinY && mouseY <= btnMaxY {
-			fmt.Println("rankbtn")
 			return true
 		}
 	}
