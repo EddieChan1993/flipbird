@@ -283,7 +283,6 @@ func (g *Game) hit() bool {
 			//出去
 			g.pipeHitMode = PipeOut
 			g.score++
-			g.bestScore = int(math.Max(float64(g.score), float64(g.bestScore)))
 			//fmt.Println("成功出去  score", g.score, " best score", g.bestScore)
 		}
 	}
