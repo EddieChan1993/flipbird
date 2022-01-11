@@ -17,6 +17,7 @@ const Salt = "DC"
 type IScoreDb interface {
 	Save(score int)
 	GetBestScore() int
+	GetLastScore() int
 }
 
 type ScoreDb struct {
@@ -72,6 +73,10 @@ func (s *ScoreDb) Save(score int) {
 
 func (s *ScoreDb) GetBestScore() int {
 	return s.BestScore
+}
+
+func (s *ScoreDb) GetLastScore() int {
+	return s.NowScore
 }
 
 func (s *ScoreDb) md5(score int) string {

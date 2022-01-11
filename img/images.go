@@ -43,3 +43,9 @@ var RankBtn []byte
 
 //go:embed flappybird/tutorial.png
 var Tutorial []byte
+
+//go:embed flappybird/score_panel.png
+var RankPanelPng []byte
+
+//go:embed flappybird/numscore/*
+var NumSmallPng embed.FS

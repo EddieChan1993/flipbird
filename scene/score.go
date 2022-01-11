@@ -13,8 +13,10 @@ import (
 )
 
 var ScoreImg [10]*ebiten.Image
+var ScoreMiniImg [10]*ebiten.Image
 
 const scorePath = "flappybird/fontscore"
+const scoreMiniPath = "flappybird/numscore"
 
 func init() {
 	scorePngFiles, err := fs.ReadDir(img.ScorePngs, scorePath)
@@ -33,14 +35,33 @@ func init() {
 		}
 		ScoreImg[i] = ebiten.NewImageFromImage(scoreP)
 	}
+
+	scoreMiniPngFiles, err := fs.ReadDir(img.NumSmallPng, scoreMiniPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	//打印出文件名称
+	for i, file := range scoreMiniPngFiles {
+		scorePng, err := fs.ReadFile(img.NumSmallPng, scoreMiniPath+"/"+file.Name())
+		if err != nil {
+			log.Fatal(err)
+		}
+		scoreP, _, err := image.Decode(bytes.NewReader(scorePng))
+		if err != nil {
+			log.Fatal(err)
+		}
+		ScoreMiniImg[i] = ebiten.NewImageFromImage(scoreP)
+	}
 }
 
 type ScorePng struct {
-	Width int
+	ScoreWidth     int
+	ScoreMiniWidth int
 }
 
 func (s *ScorePng) Init() {
-	s.Width, _ = ScoreImg[0].Size()
+	s.ScoreWidth, _ = ScoreImg[0].Size()
+	s.ScoreMiniWidth, _ = ScoreMiniImg[0].Size()
 }
 func (s *ScorePng) ScoreDivide(score int) []int {
 	if score <= 0 {

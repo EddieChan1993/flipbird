@@ -32,6 +32,7 @@ const (
 	ModeTitle Mode = iota
 	ModeGame
 	ModeGameOver
+	ModeRankLook
 )
 
 const (
@@ -74,6 +75,7 @@ type Game struct {
 	birds     scene.Birds
 	gameScene scene.GameExtra
 	scorePng  scene.ScorePng
+	rankPanel scene.Rank
 
 	mode    Mode
 	count   int
@@ -91,6 +93,7 @@ type Game struct {
 	pipeTileYs []int
 
 	score         int
+	lastScore     int
 	bestScore     int
 	gameOverCount int
 	pipeHitMode   Mode
@@ -113,7 +116,9 @@ func (g *Game) init() {
 	g.birds.Init()
 	g.gameScene.Init()
 	g.scoreDB = game.Init()
+	g.rankPanel.Init()
 	g.bestScore = g.scoreDB.GetBestScore()
+	g.lastScore = g.scoreDB.GetLastScore()
 	g.score = 0
 	g.pipeHitMode = PipeNone
 	g.x16 = 0
@@ -136,7 +141,16 @@ func (g *Game) Update() error {
 	switch g.mode {
 	case ModeTitle:
 		if g.isKeyJustPressed() {
-			g.mode = ModeGame
+			if g.isPlayBtn() {
+				g.mode = ModeGame
+			}
+			if g.isRankBtn() {
+				g.mode = ModeRankLook
+			}
+		}
+	case ModeRankLook:
+		if g.isKeyJustPressed() {
+			g.mode = ModeTitle
 		}
 	case ModeGame:
 		g.count++
@@ -179,11 +193,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.drawBird(screen)
 	g.drawPipe(screen)
 	g.drawScore(screen)
-	g.DrawGameOver(screen)
-	g.DrawGameStart(screen)
+	g.drawGameOver(screen)
+	g.drawGameStart(screen)
+	g.drawRankInfo(screen)
 }
 
-func (g *Game) DrawGameOver(screen *ebiten.Image) {
+func (g *Game) drawGameOver(screen *ebiten.Image) {
 	if g.mode != ModeGameOver {
 		return
 	}
@@ -195,19 +210,18 @@ func (g *Game) DrawGameOver(screen *ebiten.Image) {
 }
 
 func (g *Game) drawScore(screen *ebiten.Image) {
-	if g.mode != ModeGame && g.mode != ModeGameOver {
-		return
-	}
-	scoreSlice := g.scorePng.ScoreDivide(g.score)
-	op := &ebiten.DrawImageOptions{}
-	for i, scorePer := range scoreSlice {
-		op.GeoM.Reset()
-		if i == 0 {
-			op.GeoM.Translate(screenWidth-float64(g.scorePng.Width*(i+1))-10, 0)
-		} else {
-			op.GeoM.Translate(screenWidth-float64(g.scorePng.Width*(i+1))-8, 0)
+	if g.mode == ModeGame || g.mode == ModeGameOver {
+		scoreSlice := g.scorePng.ScoreDivide(g.score)
+		op := &ebiten.DrawImageOptions{}
+		for i, scorePer := range scoreSlice {
+			op.GeoM.Reset()
+			if i == 0 {
+				op.GeoM.Translate(screenWidth-float64(g.scorePng.ScoreWidth*(i+1))-10, 0)
+			} else {
+				op.GeoM.Translate(screenWidth-float64(g.scorePng.ScoreWidth*(i+1))-8, 0)
+			}
+			screen.DrawImage(scene.ScoreImg[scorePer], op)
 		}
-		screen.DrawImage(scene.ScoreImg[scorePer], op)
 	}
 }
 
@@ -225,13 +239,10 @@ func (g *Game) drawBird(screen *ebiten.Image) {
 	op.Filter = ebiten.FilterLinear
 	screen.DrawImage(scene.BirdImg[index], op)
 
-	//ebitenutil.DrawRect(screen, float64(g.x16/g.birds.GameOverTitleWidth)-float64(g.cameraX), float64(g.y16/g.birds.Height)-float64(g.cameraY), float64(g.birds.WidthPhysics), float64(g.birds.HeightPhysics), color.RGBA{255, 100, 100, 100})
+	//ebitenutil.DrawRect(screen, float64(g.x16/g.birds.GameOverTitleWidth)-float64(g.cameraX), float64(g.y16/g.birds.RankPanelH)-float64(g.cameraY), float64(g.birds.WidthPhysics), float64(g.birds.HeightPhysics), color.RGBA{255, 100, 100, 100})
 }
 
 func (g *Game) isKeyJustPressed() bool {
-	if inpututil.IsKeyJustPressed(ebiten.KeySpace) {
-		return true
-	}
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
 		return true
 	}
@@ -309,7 +320,7 @@ func (g *Game) drawScene(screen *ebiten.Image) {
 	}
 }
 
-func (g *Game) DrawGameStart(screen *ebiten.Image) {
+func (g *Game) drawGameStart(screen *ebiten.Image) {
 	if g.mode != ModeTitle {
 		return
 	}
@@ -333,6 +344,71 @@ func (g *Game) DrawGameStart(screen *ebiten.Image) {
 	op.GeoM.Translate(-float64(g.gameScene.TutorialWidth/2), float64(g.gameScene.TutorialHeight))
 	op.GeoM.Translate(screenWidth/2, screenHeight*2/5)
 	screen.DrawImage(scene.TutorialPng, op)
+}
+
+func (g *Game) isPlayBtn() bool {
+	mouseX, mouseY := ebiten.CursorPosition()
+	btnMinX := screenWidth/2 - g.gameScene.GamePlayBtnPngWidth
+	btnMaxX := screenWidth / 2
+	btnMinY := screenHeight * 2 / 5
+	btnMaxY := btnMinY + g.gameScene.GamePlayBtnPngHeight
+	if mouseX >= btnMinX && mouseX <= btnMaxX {
+		if mouseY >= btnMinY && mouseY <= btnMaxY {
+			fmt.Println("playbtn")
+			return true
+		}
+	}
+	return false
+}
+
+func (g *Game) isRankBtn() bool {
+	mouseX, mouseY := ebiten.CursorPosition()
+	btnMinX := screenWidth / 2
+	btnMaxX := btnMinX + g.gameScene.GameRankBtnPngWidth
+	btnMinY := screenHeight * 2 / 5
+	btnMaxY := btnMinY + g.gameScene.GameRankBtnPngHeight
+	if mouseX >= btnMinX && mouseX <= btnMaxX {
+		if mouseY >= btnMinY && mouseY <= btnMaxY {
+			fmt.Println("rankbtn")
+			return true
+		}
+	}
+	return false
+}
+
+func (g *Game) drawRankInfo(screen *ebiten.Image) {
+	if g.mode != ModeRankLook {
+		return
+	}
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Reset()
+	op.GeoM.Translate(-float64(g.rankPanel.RankPanelW/2), 0)
+	op.GeoM.Translate(screenWidth/2, screenHeight*1/4)
+	screen.DrawImage(scene.RankPanel, op)
+
+	lastScoreSlice := g.scorePng.ScoreDivide(g.lastScore)
+	for i, scorePer := range lastScoreSlice {
+		op.GeoM.Reset()
+		op.GeoM.Translate(float64(g.rankPanel.RankPanelW/4)+15, float64(g.rankPanel.RankPanelH/2-25))
+		if i == 0 {
+			op.GeoM.Translate(screenWidth/2, screenHeight*1/4)
+		} else {
+			op.GeoM.Translate(screenWidth/2-float64(g.scorePng.ScoreMiniWidth*(i)), screenHeight*1/4)
+		}
+		screen.DrawImage(scene.ScoreMiniImg[scorePer], op)
+	}
+
+	bestScoreSlice := g.scorePng.ScoreDivide(g.bestScore)
+	for i, scorePer := range bestScoreSlice {
+		op.GeoM.Reset()
+		op.GeoM.Translate(float64(g.rankPanel.RankPanelW/4)+15, float64(g.rankPanel.RankPanelH/2+15))
+		if i == 0 {
+			op.GeoM.Translate(screenWidth/2, screenHeight*1/4)
+		} else {
+			op.GeoM.Translate(screenWidth/2-float64(g.scorePng.ScoreMiniWidth*(i)), screenHeight*1/4)
+		}
+		screen.DrawImage(scene.ScoreMiniImg[scorePer], op)
+	}
 }
 
 func main() {

@@ -47,18 +47,20 @@ func init() {
 }
 
 type GameExtra struct {
-	GameOverTitleWidth  int
-	GameStartTitleWidth int
-	GamePlayBtnPngWidth int
-	GameRankBtnPngWidth int
-	TutorialWidth       int
-	TutorialHeight      int
+	GameOverTitleWidth   int
+	GameStartTitleWidth  int
+	GamePlayBtnPngWidth  int
+	GamePlayBtnPngHeight int
+	GameRankBtnPngWidth  int
+	GameRankBtnPngHeight int
+	TutorialWidth        int
+	TutorialHeight       int
 }
 
 func (g *GameExtra) Init() {
 	g.GameOverTitleWidth, _ = GameOverPng.Size()
 	g.GameStartTitleWidth, _ = GameTitlePng.Size()
-	g.GamePlayBtnPngWidth, _ = GamePlayBtnPng.Size()
-	g.GameRankBtnPngWidth, _ = GameRankBtnPng.Size()
+	g.GamePlayBtnPngWidth, g.GamePlayBtnPngHeight = GamePlayBtnPng.Size()
+	g.GameRankBtnPngWidth, g.GameRankBtnPngHeight = GameRankBtnPng.Size()
 	g.TutorialWidth, g.TutorialHeight = TutorialPng.Size()
 }
